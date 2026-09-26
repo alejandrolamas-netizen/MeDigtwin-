@@ -221,7 +221,9 @@ export class MedDigtwinStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
 
     new cdk.CfnOutput(this, 'ApiUrl', {
-      value: 'http://' + alb.loadBalancerDnsName,
+      value: certificateArn
+        ? (domainName ? 'https://' + domainName : 'https://' + alb.loadBalancerDnsName)
+        : 'http://' + alb.loadBalancerDnsName,
     });
 
     new cdk.CfnOutput(this, 'EcrRepositoryUri', {
