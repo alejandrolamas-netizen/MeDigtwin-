@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - "api/**"
-      - "infra/cdk/**"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
@@ -40,15 +39,11 @@ jobs:
       - name: Build and push API image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" ./api
-          docker push "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build -t "$REGISTRY/$ECR_REPOSITORY:latest" ./api
+          docker push "$REGISTRY/$ECR_REPOSITORY:latest"
 
-      - name: Update ECS task definition image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Force ECS deployment
         run: |
           aws ecs update-service             --cluster "$ECS_CLUSTER"             --service "$ECS_SERVICE"             --force-new-deployment             --region "$AWS_REGION"
 
