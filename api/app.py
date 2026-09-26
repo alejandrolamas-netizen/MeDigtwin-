@@ -3,14 +3,31 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import os
 from uuid import uuid4
+from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient, decode as jwt_decode
 from pydantic import BaseModel, Field
+import json
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
+DATA_DIR = Path(os.getenv('DATA_DIR', '/tmp/meddigtwin-data'))
+AUDIT_FILE = DATA_DIR / 'audit.jsonl'
+
+
+def audit(event: str, identity: dict[str, str], details: dict) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    record = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'event': event,
+        'tenant_id': identity.get('tenant_id'),
+        'role': identity.get('role'),
+        'details': details,
+    }
+    with AUDIT_FILE.open('a', encoding='utf-8') as fh:
+        fh.write(json.dumps(record, separators=(',', ':')) + '\n')
 
 app = FastAPI(
     title="MedDigtwin API",
@@ -137,8 +154,10 @@ def create_simulation(
         raise HTTPException(status_code=403, detail="operator role required")
     tenant_id = identity["tenant_id"]
     result = run_model(payload)
+    simulation_id = str(uuid4())
+    audit('simulation.created', identity, {'simulation_id': simulation_id, 'inputs': payload.model_dump()})
     return SimulationResult(
-        simulation_id=str(uuid4()),
+        simulation_id=simulation_id,
         tenant_id=tenant_id,
         created_at=datetime.now(timezone.utc).isoformat(),
         inputs=payload,
