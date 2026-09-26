@@ -22,7 +22,8 @@
       "Action": [
         "ecs:DescribeServices",
         "ecs:DescribeTaskDefinition",
-        "ecs:UpdateService"
+        "ecs:UpdateService",
+    "ecs:RegisterTaskDefinition"
       ],
       "Resource": "*"
     }
