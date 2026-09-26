@@ -200,8 +200,10 @@ def what_if(
     return create_simulation(payload, x_tenant_id, identity)
 
 @app.get("/api/v1/audit")
-def audit_status(x_tenant_id: str | None = Header(default=None)) -> dict:
-    identity = authenticated_tenant(x_tenant_id=x_tenant_id)
+def audit_status(
+    x_tenant_id: str | None = Header(default=None),
+    identity: dict[str, str] = Depends(authenticated_tenant),
+) -> dict:
     if identity["role"] not in {"admin", "demo"}:
         raise HTTPException(status_code=403, detail="admin role required")
     if AUDIT_TABLE and _dynamodb:
@@ -224,9 +226,12 @@ def audit_status(x_tenant_id: str | None = Header(default=None)) -> dict:
     return {"tenant_id": identity["tenant_id"], "events": events}
 
 @app.get("/api/v1/bottlenecks")
-def bottlenecks(x_tenant_id: str | None = Header(default=None)) -> dict:
+def bottlenecks(
+    x_tenant_id: str | None = Header(default=None),
+    identity: dict[str, str] = Depends(authenticated_tenant),
+) -> dict:
     return {
-        "tenant_id": authenticated_tenant(x_tenant_id=x_tenant_id)["tenant_id"],
+        "tenant_id": identity["tenant_id"],
         "mode": "synthetic",
         "items": [
             {"rank": 1, "resource": "Emergency capacity", "utilization_pct": 84, "signal": "HIGH"},
