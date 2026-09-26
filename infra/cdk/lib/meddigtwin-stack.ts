@@ -61,6 +61,13 @@ export class MedDigtwinStack extends cdk.Stack {
         SYNTHETIC_DATA_ONLY: 'true',
       },
       portMappings: [{ containerPort: 8000 }],
+      healthCheck: {
+        command: ['CMD-SHELL', "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3,
+        startPeriod: cdk.Duration.seconds(20),
+      },
     });
 
     const service = new ecs.FargateService(this, 'MedDigtwinApiService', {
@@ -70,6 +77,7 @@ export class MedDigtwinStack extends cdk.Stack {
       assignPublicIp: false,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
+      circuitBreaker: { rollback: true },
     });
 
     const alb = new elbv2.ApplicationLoadBalancer(this, 'MedDigtwinAlb', {
