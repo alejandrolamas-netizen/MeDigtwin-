@@ -2,10 +2,17 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "EcrAuth",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "EcrPush",
       "Effect": "Allow",
       "Action": [
-        "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",
         "ecr:CompleteLayerUpload",
         "ecr:InitiateLayerUpload",
@@ -23,7 +30,7 @@
         "ecs:DescribeServices",
         "ecs:DescribeTaskDefinition",
         "ecs:UpdateService",
-    "ecs:RegisterTaskDefinition"
+        "ecs:RegisterTaskDefinition"
       ],
       "Resource": "*"
     },
