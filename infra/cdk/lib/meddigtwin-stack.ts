@@ -134,7 +134,7 @@ export class MedDigtwinStack extends cdk.Stack {
     const service = new ecs.FargateService(this, 'MedDigtwinApiService', {
       cluster,
       taskDefinition,
-      desiredCount: 1,
+      desiredCount: 0,
       assignPublicIp: false,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
