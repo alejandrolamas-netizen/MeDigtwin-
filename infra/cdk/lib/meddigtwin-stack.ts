@@ -34,6 +34,10 @@ export class MedDigtwinStack extends cdk.Stack {
       selfSignUpEnabled: false,
       signInAliases: { email: true },
       standardAttributes: { email: { required: true, mutable: false } },
+      customAttributes: {
+        tenant_id: new cognito.StringAttribute({ mutable: false }),
+        role: new cognito.StringAttribute({ mutable: true }),
+      },
       passwordPolicy: {
         minLength: 12,
         requireLowercase: true,
@@ -69,6 +73,8 @@ export class MedDigtwinStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const environment = (this.node.tryGetContext('environment') as string) || 'demo';
+
     const cluster = new ecs.Cluster(this, 'MedDigtwinCluster', {
       vpc,
       containerInsights: true,
@@ -102,7 +108,7 @@ export class MedDigtwinStack extends cdk.Stack {
       image: ecs.ContainerImage.fromEcrRepository(repository, 'latest'),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'meddigtwin-api', logGroup }),
       environment: {
-        ENVIRONMENT: 'demo',
+        ENVIRONMENT: environment,
         SYNTHETIC_DATA_ONLY: 'true',
         OIDC_ISSUER: cdk.Fn.sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}'),
         OIDC_AUDIENCE: userPoolClient.userPoolClientId,
