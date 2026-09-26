@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import os
 from uuid import uuid4
 from pathlib import Path
+import boto3
 
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -15,10 +16,12 @@ import json
 bearer_scheme = HTTPBearer(auto_error=False)
 DATA_DIR = Path(os.getenv('DATA_DIR', '/tmp/meddigtwin-data'))
 AUDIT_FILE = DATA_DIR / 'audit.jsonl'
+SIMULATIONS_TABLE = os.getenv('DDB_SIMULATIONS_TABLE')
+AUDIT_TABLE = os.getenv('DDB_AUDIT_TABLE')
+_dynamodb = boto3.resource('dynamodb') if SIMULATIONS_TABLE or AUDIT_TABLE else None
 
 
 def audit(event: str, identity: dict[str, str], details: dict) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     record = {
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'event': event,
@@ -26,8 +29,30 @@ def audit(event: str, identity: dict[str, str], details: dict) -> None:
         'role': identity.get('role'),
         'details': details,
     }
+    if AUDIT_TABLE and _dynamodb:
+        _dynamodb.Table(AUDIT_TABLE).put_item(Item={
+            'tenant_id': 'TENANT#' + str(identity.get('tenant_id')),
+            'event_key': 'AUDIT#' + record['timestamp'] + '#' + str(uuid4()),
+            **record,
+        })
+        return
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     with AUDIT_FILE.open('a', encoding='utf-8') as fh:
         fh.write(json.dumps(record, separators=(',', ':')) + '\n')
+
+def persist_simulation(result: SimulationResult) -> None:
+    if SIMULATIONS_TABLE and _dynamodb:
+        _dynamodb.Table(SIMULATIONS_TABLE).put_item(Item={
+            'tenant_id': 'TENANT#' + result.tenant_id,
+            'simulation_key': 'SIM#' + result.created_at + '#' + result.simulation_id,
+            'simulation_id': result.simulation_id,
+            'created_at': result.created_at,
+            'inputs': result.inputs.model_dump(),
+            'projected_arrivals': result.projected_arrivals,
+            'bed_occupancy_pct': result.bed_occupancy_pct,
+            'icu_occupancy_pct': result.icu_occupancy_pct,
+            'avg_wait_min': result.avg_wait_min,
+        })
 
 app = FastAPI(
     title="MedDigtwin API",
@@ -149,33 +174,43 @@ def create_simulation(
     payload: SimulationInput,
     x_tenant_id: str | None = Header(default=None),
 ) -> SimulationResult:
-    identity = authenticated_tenant(x_tenant_id=x_tenant_id)
     if identity["role"] not in {"admin", "operator", "demo"}:
         raise HTTPException(status_code=403, detail="operator role required")
     tenant_id = identity["tenant_id"]
     result = run_model(payload)
     simulation_id = str(uuid4())
     audit('simulation.created', identity, {'simulation_id': simulation_id, 'inputs': payload.model_dump()})
-    return SimulationResult(
+    output = SimulationResult(
         simulation_id=simulation_id,
         tenant_id=tenant_id,
         created_at=datetime.now(timezone.utc).isoformat(),
         inputs=payload,
         **result,
     )
+    persist_simulation(output)
+    return output
 
 @app.post("/api/v1/scenarios/what-if", response_model=SimulationResult)
 def what_if(
     payload: SimulationInput,
     x_tenant_id: str | None = Header(default=None),
+    identity: dict[str, str] = Depends(authenticated_tenant),
 ) -> SimulationResult:
-    return create_simulation(payload, x_tenant_id)
+    return create_simulation(payload, x_tenant_id, identity)
 
 @app.get("/api/v1/audit")
 def audit_status(x_tenant_id: str | None = Header(default=None)) -> dict:
     identity = authenticated_tenant(x_tenant_id=x_tenant_id)
     if identity["role"] not in {"admin", "demo"}:
         raise HTTPException(status_code=403, detail="admin role required")
+    if AUDIT_TABLE and _dynamodb:
+        from boto3.dynamodb.conditions import Key
+        response = _dynamodb.Table(AUDIT_TABLE).query(
+            KeyConditionExpression=Key('tenant_id').eq('TENANT#' + identity['tenant_id']),
+            ScanIndexForward=False,
+            Limit=100,
+        )
+        return {"tenant_id": identity["tenant_id"], "events": response.get("Items", [])}
     events = []
     if AUDIT_FILE.exists():
         for line in AUDIT_FILE.read_text(encoding="utf-8").splitlines()[-100:]:
