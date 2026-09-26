@@ -26,6 +26,20 @@
     "ecs:RegisterTaskDefinition"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "PassEcsRoles",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::*:role/MedDigtwinStack-MedDigtwinTaskRole-*",
+        "arn:aws:iam::*:role/MedDigtwinStack-MedDigtwinExecutionRole-*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ecs-tasks.amazonaws.com"
+        }
+      }
     }
   ]
 }
