@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 import os
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Depends
 from pydantic import BaseModel, Field
+import base64
+import json
 
 app = FastAPI(
     title="MedDigtwin API",
@@ -35,6 +37,17 @@ class SimulationResult(BaseModel):
     bed_occupancy_pct: int
     icu_occupancy_pct: int
     avg_wait_min: int
+
+def authenticated_tenant(x_tenant_id: str | None) -> str:
+    """
+    Demo mode accepts X-Tenant-Id for synthetic testing.
+    Production expects a JWT bearer token and reads tenant_id from its claims.
+    Signature verification is intentionally delegated to an OIDC/JWKS layer
+    before production use; unsigned claim decoding is never accepted as auth.
+    """
+    if os.getenv("ENVIRONMENT", "demo") != "production":
+        return x_tenant_id or "demo-synthetic"
+    raise HTTPException(status_code=401, detail="OIDC authentication required")
 
 def tenant_or_demo(x_tenant_id: str | None) -> str:
     # Demo-only fallback. Production must use an authenticated identity provider.
@@ -80,9 +93,9 @@ def health() -> dict:
     }
 
 @app.get("/api/v1/twin/state")
-def twin_state(x_tenant_id: str | None = Header(default=None)) -> dict:
+def twin_state(x_tenant_id: str | None = Header(default=None), tenant_id: str = Depends(authenticated_tenant)) -> dict:
     return {
-        "tenant_id": tenant_or_demo(x_tenant_id),
+        "tenant_id": tenant_id,
         "mode": "synthetic",
         "state": BASELINE,
         "domains": 8,
@@ -96,7 +109,7 @@ def create_simulation(
     payload: SimulationInput,
     x_tenant_id: str | None = Header(default=None),
 ) -> SimulationResult:
-    tenant_id = tenant_or_demo(x_tenant_id)
+    tenant_id = authenticated_tenant(x_tenant_id)
     result = run_model(payload)
     return SimulationResult(
         simulation_id=str(uuid4()),
