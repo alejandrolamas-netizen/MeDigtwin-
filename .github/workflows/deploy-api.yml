@@ -77,4 +77,3 @@ jobs:
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE" \
             --region "$AWS_REGION"
-s "$ECS_SERVICE"             --region "$AWS_REGION"
