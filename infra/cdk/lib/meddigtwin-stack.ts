@@ -9,6 +9,7 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
 export class MedDigtwinStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -48,6 +49,26 @@ export class MedDigtwinStack extends cdk.Stack {
       authFlows: { userPassword: true, userSrp: true },
     });
 
+    const simulationsTable = new dynamodb.Table(this, 'MedDigtwinSimulationsTable', {
+      tableName: 'meddigtwin-simulations',
+      partitionKey: { name: 'tenant_id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'simulation_key', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecovery: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const auditTable = new dynamodb.Table(this, 'MedDigtwinAuditTable', {
+      tableName: 'meddigtwin-audit',
+      partitionKey: { name: 'tenant_id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'event_key', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecovery: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     const cluster = new ecs.Cluster(this, 'MedDigtwinCluster', {
       vpc,
       containerInsights: true,
@@ -70,6 +91,7 @@ export class MedDigtwinStack extends cdk.Stack {
     });
 
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'MedDigtwinTaskDefinition', {
+      family: 'meddigtwin-api',
       cpu: 512,
       memoryLimitMiB: 1024,
       executionRole,
@@ -85,6 +107,9 @@ export class MedDigtwinStack extends cdk.Stack {
         OIDC_ISSUER: cdk.Fn.sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}'),
         OIDC_AUDIENCE: userPoolClient.userPoolClientId,
         OIDC_JWKS_URL: cdk.Fn.sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}/.well-known/jwks.json'),
+        DDB_SIMULATIONS_TABLE: simulationsTable.tableName,
+        DDB_AUDIT_TABLE: auditTable.tableName,
+        AWS_REGION: cdk.Aws.REGION,
       },
       portMappings: [{ containerPort: 8000 }],
       healthCheck: {
@@ -95,6 +120,9 @@ export class MedDigtwinStack extends cdk.Stack {
         startPeriod: cdk.Duration.seconds(20),
       },
     });
+
+    simulationsTable.grantReadWriteData(taskRole);
+    auditTable.grantReadWriteData(taskRole);
 
     const service = new ecs.FargateService(this, 'MedDigtwinApiService', {
       cluster,
