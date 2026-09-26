@@ -8,6 +8,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 
 export class MedDigtwinStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -25,6 +26,26 @@ export class MedDigtwinStack extends cdk.Stack {
       encryption: ecr.RepositoryEncryption.AES_256,
       lifecycleRules: [{ maxImageCount: 10 }],
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const userPool = new cognito.UserPool(this, 'MedDigtwinUserPool', {
+      userPoolName: 'meddigtwin-users',
+      selfSignUpEnabled: false,
+      signInAliases: { email: true },
+      standardAttributes: { email: { required: true, mutable: false } },
+      passwordPolicy: {
+        minLength: 12,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const userPoolClient = userPool.addClient('MedDigtwinWebClient', {
+      generateSecret: false,
+      authFlows: { userPassword: true, userSrp: true },
     });
 
     const cluster = new ecs.Cluster(this, 'MedDigtwinCluster', {
@@ -61,6 +82,9 @@ export class MedDigtwinStack extends cdk.Stack {
       environment: {
         ENVIRONMENT: 'demo',
         SYNTHETIC_DATA_ONLY: 'true',
+        OIDC_ISSUER: cdk.Fn.sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}'),
+        OIDC_AUDIENCE: userPoolClient.userPoolClientId,
+        OIDC_JWKS_URL: cdk.Fn.sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}/.well-known/jwks.json'),
       },
       portMappings: [{ containerPort: 8000 }],
       healthCheck: {
@@ -157,6 +181,9 @@ export class MedDigtwinStack extends cdk.Stack {
     if (domainName) {
       new cdk.CfnOutput(this, 'ConfiguredDomain', { value: domainName });
     }
+
+    new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
+    new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
 
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: 'http://' + alb.loadBalancerDnsName,
