@@ -5,11 +5,12 @@ import os
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient, decode as jwt_decode
 from pydantic import BaseModel, Field
-import base64
-import json
 
-app = FastAPI(
+
+bearer_scheme = HTTPBearer(auto_error=False)\n\napp = FastAPI(
     title="MedDigtwin API",
     version="0.1.0",
     description="Synthetic healthcare operational simulation API.",
@@ -38,16 +39,33 @@ class SimulationResult(BaseModel):
     icu_occupancy_pct: int
     avg_wait_min: int
 
-def authenticated_tenant(x_tenant_id: str | None) -> str:
-    """
-    Demo mode accepts X-Tenant-Id for synthetic testing.
-    Production expects a JWT bearer token and reads tenant_id from its claims.
-    Signature verification is intentionally delegated to an OIDC/JWKS layer
-    before production use; unsigned claim decoding is never accepted as auth.
-    """
+def authenticated_tenant(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    x_tenant_id: str | None = Header(default=None),
+) -> str:
     if os.getenv("ENVIRONMENT", "demo") != "production":
         return x_tenant_id or "demo-synthetic"
-    raise HTTPException(status_code=401, detail="OIDC authentication required")
+
+    issuer = os.getenv("OIDC_ISSUER")
+    audience = os.getenv("OIDC_AUDIENCE")
+    jwks_url = os.getenv("OIDC_JWKS_URL")
+    if not issuer or not audience or not jwks_url:
+        raise HTTPException(status_code=503, detail="OIDC configuration incomplete")
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Bearer token required")
+
+    try:
+        token = credentials.credentials
+        signing_key = PyJWKClient(jwks_url).get_signing_key_from_jwt(token).key
+        claims = jwt_decode(token, signing_key, algorithms=["RS256"], audience=audience, issuer=issuer)
+        tenant_id = claims.get("tenant_id") or claims.get("custom:tenant_id")
+        if not tenant_id:
+            raise HTTPException(status_code=403, detail="tenant_id claim required")
+        return str(tenant_id)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid OIDC token")
 
 def tenant_or_demo(x_tenant_id: str | None) -> str:
     # Demo-only fallback. Production must use an authenticated identity provider.
