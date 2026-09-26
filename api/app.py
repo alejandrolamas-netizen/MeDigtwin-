@@ -10,7 +10,9 @@ from jwt import PyJWKClient, decode as jwt_decode
 from pydantic import BaseModel, Field
 
 
-bearer_scheme = HTTPBearer(auto_error=False)\n\napp = FastAPI(
+bearer_scheme = HTTPBearer(auto_error=False)
+
+app = FastAPI(
     title="MedDigtwin API",
     version="0.1.0",
     description="Synthetic healthcare operational simulation API.",
@@ -42,9 +44,9 @@ class SimulationResult(BaseModel):
 def authenticated_tenant(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     x_tenant_id: str | None = Header(default=None),
-) -> str:
+) -> dict[str, str]:
     if os.getenv("ENVIRONMENT", "demo") != "production":
-        return x_tenant_id or "demo-synthetic"
+        return {"tenant_id": x_tenant_id or "demo-synthetic", "role": "demo"}
 
     issuer = os.getenv("OIDC_ISSUER")
     audience = os.getenv("OIDC_AUDIENCE")
@@ -53,15 +55,17 @@ def authenticated_tenant(
         raise HTTPException(status_code=503, detail="OIDC configuration incomplete")
     if not credentials or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Bearer token required")
-
     try:
         token = credentials.credentials
-        signing_key = PyJWKClient(jwks_url).get_signing_key_from_jwt(token).key
-        claims = jwt_decode(token, signing_key, algorithms=["RS256"], audience=audience, issuer=issuer)
+        key = PyJWKClient(jwks_url).get_signing_key_from_jwt(token).key
+        claims = jwt_decode(token, key, algorithms=["RS256"], audience=audience, issuer=issuer)
         tenant_id = claims.get("tenant_id") or claims.get("custom:tenant_id")
+        role = claims.get("role") or claims.get("custom:role") or "viewer"
         if not tenant_id:
             raise HTTPException(status_code=403, detail="tenant_id claim required")
-        return str(tenant_id)
+        if role not in {"admin", "operator", "viewer"}:
+            raise HTTPException(status_code=403, detail="Unsupported role")
+        return {"tenant_id": str(tenant_id), "role": str(role)}
     except HTTPException:
         raise
     except Exception:
@@ -111,9 +115,10 @@ def health() -> dict:
     }
 
 @app.get("/api/v1/twin/state")
-def twin_state(x_tenant_id: str | None = Header(default=None), tenant_id: str = Depends(authenticated_tenant)) -> dict:
+def twin_state(x_tenant_id: str | None = Header(default=None), identity: dict[str, str] = Depends(authenticated_tenant)) -> dict:
     return {
-        "tenant_id": tenant_id,
+        "tenant_id": identity["tenant_id"],
+        "role": identity["role"],
         "mode": "synthetic",
         "state": BASELINE,
         "domains": 8,
@@ -127,7 +132,10 @@ def create_simulation(
     payload: SimulationInput,
     x_tenant_id: str | None = Header(default=None),
 ) -> SimulationResult:
-    tenant_id = authenticated_tenant(x_tenant_id)
+    identity = authenticated_tenant(x_tenant_id=x_tenant_id)
+    if identity["role"] not in {"admin", "operator", "demo"}:
+        raise HTTPException(status_code=403, detail="operator role required")
+    tenant_id = identity["tenant_id"]
     result = run_model(payload)
     return SimulationResult(
         simulation_id=str(uuid4()),
@@ -147,7 +155,7 @@ def what_if(
 @app.get("/api/v1/bottlenecks")
 def bottlenecks(x_tenant_id: str | None = Header(default=None)) -> dict:
     return {
-        "tenant_id": tenant_or_demo(x_tenant_id),
+        "tenant_id": authenticated_tenant(x_tenant_id=x_tenant_id)["tenant_id"],
         "mode": "synthetic",
         "items": [
             {"rank": 1, "resource": "Emergency capacity", "utilization_pct": 84, "signal": "HIGH"},
