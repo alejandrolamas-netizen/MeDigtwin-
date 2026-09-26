@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 app = FastAPI(
@@ -123,3 +123,10 @@ def bottlenecks(x_tenant_id: str | None = Header(default=None)) -> dict:
             {"rank": 5, "resource": "Laboratory", "utilization_pct": 61, "signal": "NORMAL"},
         ],
     }
+
+
+def require_tenant(request: Request) -> str:
+    tenant = request.headers.get("X-Tenant-Id")
+    if os.getenv("ENVIRONMENT", "demo") == "production":
+        raise HTTPException(status_code=401, detail="Authenticated tenant identity required")
+    return tenant or "demo-synthetic"
