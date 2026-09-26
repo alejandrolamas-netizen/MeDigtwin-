@@ -18,7 +18,47 @@
 - Presentation / demo mode
 - NVIDIA + AWS reference architecture
 
-### Technology reference
+## Security
+
+Security is a first-class requirement for the MedDigtwin roadmap.
+
+### Repository security
+
+- **Do not commit secrets, credentials, API keys, private certificates, tokens or production patient data.**
+- Use environment variables or an approved secret-management service for credentials when backend services are introduced.
+- Keep synthetic/demo data separate from any future production datasets.
+- Review dependencies and third-party services before production deployment.
+- Use least-privilege IAM/RBAC policies for AWS, application services and future integrations.
+- Protect production branches with required reviews, status checks and controlled write access.
+- Enable GitHub secret scanning, push protection and Dependabot/security alerts where available.
+- Record security-relevant architectural and operational decisions in version control.
+- Report suspected vulnerabilities privately rather than publishing exploit details in an issue.
+
+### Healthcare data security
+
+MedDigtwin currently uses **synthetic healthcare data**. Any future integration with real healthcare information must be subject to an appropriate privacy, security, compliance and data-governance review before use.
+
+The project must not be treated as authorization to upload, process or expose patient-identifiable information. Future deployments should define applicable legal/regulatory requirements, data classification, retention, access controls, encryption, audit logging, incident response and vendor responsibilities.
+
+### Security boundary
+
+This repository is a prototype and does not claim that the current implementation is production-secure, clinically validated, compliant with any particular healthcare regulation, or suitable for processing regulated health information.
+
+## Ownership & intellectual property
+
+**MedDigtwin is a product/project of EmergentSoft Corporation.**
+
+Copyright © 2026 EmergentSoft Corporation. All rights reserved, unless a specific file, dependency or third-party component states otherwise.
+
+The **MedDigtwin** name, product concept, original source code, architecture, documentation, interface design and related original materials in this repository are proprietary to EmergentSoft Corporation unless explicitly identified as third-party material.
+
+No license to copy, modify, distribute, sublicense, commercialize, resell or create derivative works from the proprietary project materials is granted by merely accessing this repository.
+
+Third-party trademarks and technologies mentioned in this repository, including NVIDIA and AWS products, remain the property of their respective owners. Their mention does not imply ownership, partnership, sponsorship, certification or endorsement unless separately documented.
+
+For commercial licensing, partnership or authorized use, contact **EmergentSoft Corporation** through the official company channels.
+
+## Technology reference
 
 The prototype maps relevant building blocks from:
 
@@ -51,11 +91,11 @@ The prototype maps relevant building blocks from:
 
 These are architecture references. Their presence in the prototype does not by itself represent deployment, formal co-development, sponsorship, certification or endorsement.
 
-### Safety boundary
+## Safety boundary
 
 MedDigtwin is an operational simulation prototype using synthetic data. It is **not a clinical decision-making system** and does not replace qualified clinical judgment.
 
-### Run
+## Run
 
 Open `index.html` in a modern browser. No build step is required.
 
