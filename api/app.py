@@ -171,6 +171,22 @@ def what_if(
 ) -> SimulationResult:
     return create_simulation(payload, x_tenant_id)
 
+@app.get("/api/v1/audit")
+def audit_status(x_tenant_id: str | None = Header(default=None)) -> dict:
+    identity = authenticated_tenant(x_tenant_id=x_tenant_id)
+    if identity["role"] not in {"admin", "demo"}:
+        raise HTTPException(status_code=403, detail="admin role required")
+    events = []
+    if AUDIT_FILE.exists():
+        for line in AUDIT_FILE.read_text(encoding="utf-8").splitlines()[-100:]:
+            try:
+                item = json.loads(line)
+                if item.get("tenant_id") == identity["tenant_id"]:
+                    events.append(item)
+            except json.JSONDecodeError:
+                continue
+    return {"tenant_id": identity["tenant_id"], "events": events}
+
 @app.get("/api/v1/bottlenecks")
 def bottlenecks(x_tenant_id: str | None = Header(default=None)) -> dict:
     return {
