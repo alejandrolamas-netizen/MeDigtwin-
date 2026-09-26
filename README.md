@@ -2,7 +2,7 @@
 
 ## Healthcare Operational Digital Twin
 
-**MedDigtwin by EmergentSoft** is a synthetic healthcare operations prototype for observing, modeling and simulating hospital capacity, patient flow, workforce and operational constraints.
+**MedDigtwin by EmergentSoft** is an AWS-ready healthcare operational digital twin for observing, modeling and simulating hospital capacity, patient flow, workforce and operational constraints. The current environment uses synthetic data.
 
 ### Core capabilities
 
@@ -20,7 +20,7 @@
 
 ## Security
 
-Security is a first-class requirement for the MedDigtwin roadmap.
+Security is a first-class requirement for MedDigtwin.
 
 ### Repository security
 
@@ -42,7 +42,7 @@ The project must not be treated as authorization to upload, process or expose pa
 
 ### Security boundary
 
-This repository is a prototype and does not claim that the current implementation is production-secure, clinically validated, compliant with any particular healthcare regulation, or suitable for processing regulated health information.
+The current product is AWS-ready, but AWS-ready does not mean production healthcare compliance, clinical validation, regulatory certification or authorization to process regulated health information.
 
 ## Ownership & intellectual property
 
@@ -99,14 +99,22 @@ MedDigtwin is an operational simulation prototype using synthetic data. It is **
 
 Open `index.html` in a modern browser. No build step is required.
 
-## Product direction
+## Commercial readiness
+
+MedDigtwin is the first EmergentSoft product formally presented as AWS-ready.
+
+The repository includes AWS CDK infrastructure, ECS/Fargate deployment automation, Cognito identity, DynamoDB persistence, audit logging, WAF support and a commercial launch package.
+
+Current commercial offer: enterprise pilot / custom quotation.
+
+## Product roadmap
 
 EmergentSoft can evolve MedDigtwin toward:
 
-1. Real hospital data connectors
-2. Event-driven operational state synchronization
-3. NVIDIA-accelerated simulation and inference
-4. AWS cloud deployment
+1. Verified production AWS deployment
+2. Real hospital data connectors after separate governance review
+3. Event-driven operational state synchronization
+4. NVIDIA-accelerated simulation and inference
 5. Digital-world visualization
 6. Agentic operational analysis
 7. Governance, auditability and human approval workflows
