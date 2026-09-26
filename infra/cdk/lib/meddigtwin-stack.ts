@@ -6,6 +6,8 @@ import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
 export class MedDigtwinStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -85,19 +87,76 @@ export class MedDigtwinStack extends cdk.Stack {
       internetFacing: true,
     });
 
-    const listener = alb.addListener('HttpListener', {
+    const certificateArn = this.node.tryGetContext('certificateArn') as string | undefined;
+    const domainName = this.node.tryGetContext('domainName') as string | undefined;
+
+    const httpListener = alb.addListener('HttpListener', {
       port: 80,
       open: true,
     });
 
-    listener.addTargets('ApiTarget', {
-      port: 8000,
-      targets: [service],
-      healthCheck: {
-        path: '/health',
-        healthyHttpCodes: '200',
+    if (certificateArn) {
+      const certificate = acm.Certificate.fromCertificateArn(this, 'MedDigtwinCertificate', certificateArn);
+      const httpsListener = alb.addListener('HttpsListener', {
+        port: 443,
+        certificates: [certificate],
+        open: true,
+      });
+      httpsListener.addTargets('ApiTargetHttps', {
+        port: 8000,
+        targets: [service],
+        healthCheck: { path: '/health', healthyHttpCodes: '200' },
+      });
+      httpListener.addAction('RedirectToHttps', {
+        action: elbv2.ListenerAction.redirect({
+          protocol: 'HTTPS',
+          port: '443',
+          permanent: true,
+        }),
+      });
+    } else {
+      httpListener.addTargets('ApiTarget', {
+        port: 8000,
+        targets: [service],
+        healthCheck: { path: '/health', healthyHttpCodes: '200' },
+      });
+    }
+
+    const webAcl = new wafv2.CfnWebACL(this, 'MedDigtwinWebAcl', {
+      name: 'meddigtwin-web-acl',
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: 'meddigtwin-web-acl',
+        sampledRequestsEnabled: true,
       },
+      rules: [{
+        name: 'AWSManagedCommonRules',
+        priority: 0,
+        overrideAction: { none: {} },
+        statement: {
+          managedRuleGroupStatement: {
+            vendorName: 'AWS',
+            name: 'AWSManagedRulesCommonRuleSet',
+          },
+        },
+        visibilityConfig: {
+          cloudWatchMetricsEnabled: true,
+          metricName: 'meddigtwin-common-rules',
+          sampledRequestsEnabled: true,
+        },
+      }],
     });
+
+    new wafv2.CfnWebACLAssociation(this, 'MedDigtwinWebAclAssociation', {
+      resourceArn: alb.loadBalancerArn,
+      webAclArn: webAcl.attrArn,
+    });
+
+    if (domainName) {
+      new cdk.CfnOutput(this, 'ConfiguredDomain', { value: domainName });
+    }
 
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: 'http://' + alb.loadBalancerDnsName,
