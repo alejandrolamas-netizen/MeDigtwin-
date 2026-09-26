@@ -116,6 +116,7 @@ export class MedDigtwinStack extends cdk.Stack {
         DDB_SIMULATIONS_TABLE: simulationsTable.tableName,
         DDB_AUDIT_TABLE: auditTable.tableName,
         AWS_REGION: cdk.Aws.REGION,
+        AWS_DEFAULT_REGION: cdk.Aws.REGION,
       },
       portMappings: [{ containerPort: 8000 }],
       healthCheck: {
