@@ -173,6 +173,7 @@ def twin_state(x_tenant_id: str | None = Header(default=None), identity: dict[st
 def create_simulation(
     payload: SimulationInput,
     x_tenant_id: str | None = Header(default=None),
+    identity: dict[str, str] = Depends(authenticated_tenant),
 ) -> SimulationResult:
     if identity["role"] not in {"admin", "operator", "demo"}:
         raise HTTPException(status_code=403, detail="operator role required")
