@@ -191,6 +191,33 @@ def create_simulation(
     persist_simulation(output)
     return output
 
+@app.get("/api/v1/simulations/{simulation_id}", response_model=SimulationResult)
+def get_simulation(
+    simulation_id: str,
+    identity: dict[str, str] = Depends(authenticated_tenant),
+) -> SimulationResult:
+    if SIMULATIONS_TABLE and _dynamodb:
+        from boto3.dynamodb.conditions import Key
+        response = _dynamodb.Table(SIMULATIONS_TABLE).query(
+            KeyConditionExpression=Key('tenant_id').eq('TENANT#' + identity['tenant_id']),
+            ScanIndexForward=False,
+            Limit=100,
+        )
+        for item in response.get('Items', []):
+            if item.get('simulation_id') == simulation_id:
+                return SimulationResult(
+                    simulation_id=item['simulation_id'],
+                    tenant_id=identity['tenant_id'],
+                    created_at=item['created_at'],
+                    inputs=SimulationInput(**item['inputs']),
+                    projected_arrivals=int(item['projected_arrivals']),
+                    bed_occupancy_pct=int(item['bed_occupancy_pct']),
+                    icu_occupancy_pct=int(item['icu_occupancy_pct']),
+                    avg_wait_min=int(item['avg_wait_min']),
+                )
+    raise HTTPException(status_code=404, detail="Simulation not found")
+
+
 @app.post("/api/v1/scenarios/what-if", response_model=SimulationResult)
 def what_if(
     payload: SimulationInput,
