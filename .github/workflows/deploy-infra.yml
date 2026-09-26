@@ -14,6 +14,9 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
+  ECR_REPOSITORY: meddigtwin-api
+  ECS_CLUSTER: MedDigtwinStack-MedDigtwinCluster
+  ECS_SERVICE: MedDigtwinStack-MedDigtwinApiService
 
 jobs:
   deploy-infra:
@@ -60,3 +63,35 @@ jobs:
 
       - name: Verify deployed stack
         run: aws cloudformation describe-stacks --stack-name MedDigtwinStack --query "Stacks[0].StackStatus" --output text
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push initial API image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" ./api
+          docker push "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+
+      - name: Register initial immutable task definition
+        env:
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          aws ecs describe-task-definition             --task-definition meddigtwin-api             --region "$AWS_REGION"             --query taskDefinition > /tmp/task-definition.json
+
+          jq --arg IMAGE "$IMAGE"             'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+             | .containerDefinitions[0].image=$IMAGE'             /tmp/task-definition.json > /tmp/task-definition-rendered.json
+
+          aws ecs register-task-definition             --cli-input-json file:///tmp/task-definition-rendered.json             --region "$AWS_REGION" > /tmp/registered.json
+
+          echo "TASK_DEFINITION=$(jq -r '.taskDefinition.taskDefinitionArn' /tmp/registered.json)" >> "$GITHUB_ENV"
+
+      - name: Activate API service
+        run: |
+          aws ecs update-service             --cluster "$ECS_CLUSTER"             --service "$ECS_SERVICE"             --task-definition "$TASK_DEFINITION"             --desired-count 1             --region "$AWS_REGION"
+
+      - name: Wait for ECS service stability
+        run: |
+          aws ecs wait services-stable             --cluster "$ECS_CLUSTER"             --services "$ECS_SERVICE"             --region "$AWS_REGION"
