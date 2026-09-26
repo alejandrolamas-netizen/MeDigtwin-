@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI(
@@ -36,7 +37,9 @@ class SimulationResult(BaseModel):
     avg_wait_min: int
 
 def tenant_or_demo(x_tenant_id: str | None) -> str:
-    # Demo-only fallback. Production must require authenticated tenant identity.
+    # Demo-only fallback. Production must use an authenticated identity provider.
+    if os.getenv("ENVIRONMENT", "demo") == "production":
+        raise HTTPException(status_code=401, detail="Authenticated tenant identity required")
     return x_tenant_id or "demo-synthetic"
 
 def run_model(x: SimulationInput) -> dict[str, int]:
@@ -123,10 +126,3 @@ def bottlenecks(x_tenant_id: str | None = Header(default=None)) -> dict:
             {"rank": 5, "resource": "Laboratory", "utilization_pct": 61, "signal": "NORMAL"},
         ],
     }
-
-
-def require_tenant(request: Request) -> str:
-    tenant = request.headers.get("X-Tenant-Id")
-    if os.getenv("ENVIRONMENT", "demo") == "production":
-        raise HTTPException(status_code=401, detail="Authenticated tenant identity required")
-    return tenant or "demo-synthetic"
