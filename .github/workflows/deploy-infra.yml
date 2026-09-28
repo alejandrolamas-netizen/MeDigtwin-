@@ -2,6 +2,20 @@ name: Deploy MedDigtwin Infrastructure
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        default: production
+      marketplace_product_code:
+        description: AWS Marketplace SaaS Product Code
+        required: false
+      certificate_arn:
+        description: ACM certificate ARN for production HTTPS
+        required: false
+      domain_name:
+        description: Public MedDigtwin domain
+        required: false
   push:
     branches: [main]
     paths:
@@ -55,11 +69,21 @@ jobs:
 
       - name: Synth
         working-directory: infra/cdk
-        run: npx cdk synth
+        run: |
+          npx cdk synth \
+            -c environment="${{ inputs.environment || 'production' }}" \
+            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
+            -c certificateArn="${{ inputs.certificate_arn }}" \
+            -c domainName="${{ inputs.domain_name }}"
 
       - name: Deploy
         working-directory: infra/cdk
-        run: npx cdk deploy --require-approval never
+        run: |
+          npx cdk deploy --require-approval never \
+            -c environment="${{ inputs.environment || 'production' }}" \
+            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
+            -c certificateArn="${{ inputs.certificate_arn }}" \
+            -c domainName="${{ inputs.domain_name }}"
 
       - name: Verify deployed stack
         run: aws cloudformation describe-stacks --stack-name MedDigtwinStack --query "Stacks[0].StackStatus" --output text
