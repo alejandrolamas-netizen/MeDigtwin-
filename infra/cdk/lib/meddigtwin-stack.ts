@@ -166,6 +166,9 @@ export class MedDigtwinStack extends cdk.Stack {
     });
 
     const certificateArn = this.node.tryGetContext('certificateArn') as string | undefined;
+    if (environment === 'production' && !certificateArn) {
+      throw new Error('certificateArn is required for production HTTPS deployment');
+    }
     const domainName = this.node.tryGetContext('domainName') as string | undefined;
 
     const httpListener = alb.addListener('HttpListener', {
