@@ -6,7 +6,7 @@ from uuid import uuid4
 from pathlib import Path
 import boto3
 
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient, decode as jwt_decode
 from pydantic import BaseModel, Field
@@ -18,7 +18,9 @@ DATA_DIR = Path(os.getenv('DATA_DIR', '/tmp/meddigtwin-data'))
 AUDIT_FILE = DATA_DIR / 'audit.jsonl'
 SIMULATIONS_TABLE = os.getenv('DDB_SIMULATIONS_TABLE')
 AUDIT_TABLE = os.getenv('DDB_AUDIT_TABLE')
-_dynamodb = boto3.resource('dynamodb') if SIMULATIONS_TABLE or AUDIT_TABLE else None
+_dynamodb = boto3.resource('dynamodb') if SIMULATIONS_TABLE or AUDIT_TABLE or os.getenv('MARKETPLACE_TENANTS_TABLE') else None
+_marketplace = boto3.client('meteringmarketplace') if os.getenv('AWS_MARKETPLACE_PRODUCT_CODE') else None
+MARKETPLACE_TENANTS_TABLE = os.getenv('MARKETPLACE_TENANTS_TABLE')
 
 
 def audit(event: str, identity: dict[str, str], details: dict) -> None:
@@ -53,6 +55,47 @@ def persist_simulation(result: SimulationResult) -> None:
             'icu_occupancy_pct': result.icu_occupancy_pct,
             'avg_wait_min': result.avg_wait_min,
         })
+
+
+def resolve_marketplace_customer(registration_token: str) -> dict:
+    if not _marketplace:
+        raise HTTPException(status_code=503, detail="AWS Marketplace integration is not configured")
+    try:
+        resolved = _marketplace.resolve_customer(RegistrationToken=registration_token)
+        customer_id = resolved.get("CustomerIdentifier")
+        account_id = resolved.get("CustomerAWSAccountId")
+        license_arn = resolved.get("LicenseArn")
+        if not customer_id or not account_id:
+            raise HTTPException(status_code=502, detail="AWS Marketplace customer resolution incomplete")
+        entitlements = _marketplace.get_entitlements(
+            ProductCode=os.environ["AWS_MARKETPLACE_PRODUCT_CODE"],
+            Filter={"CUSTOMER_AWS_ACCOUNT_ID": [account_id]},
+        )
+        records = entitlements.get("Entitlements", [])
+        if not records:
+            raise HTTPException(status_code=403, detail="No active AWS Marketplace entitlement")
+        if MARKETPLACE_TENANTS_TABLE and _dynamodb:
+            _dynamodb.Table(MARKETPLACE_TENANTS_TABLE).put_item(Item={
+                "tenant_id": "awsmp-" + customer_id,
+                "customer_identifier": customer_id,
+                "customer_aws_account_id": account_id,
+                "license_arn": license_arn or "",
+                "product_code": os.environ["AWS_MARKETPLACE_PRODUCT_CODE"],
+                "entitlements": records,
+                "status": "active",
+                "source": "aws-marketplace",
+            })
+        return {
+            "tenant_id": "awsmp-" + customer_id,
+            "customer_identifier": customer_id,
+            "customer_aws_account_id": account_id,
+            "license_arn": license_arn or "",
+            "entitlements": records,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="AWS Marketplace fulfillment failed") from exc
 
 app = FastAPI(
     title="MedDigtwin API",
