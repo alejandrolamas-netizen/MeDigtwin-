@@ -73,6 +73,18 @@ export class MedDigtwinStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+
+    const marketplaceProductCode = this.node.tryGetContext('marketplaceProductCode') as string | undefined;
+
+    const marketplaceTenantsTable = new dynamodb.Table(this, 'MedDigtwinMarketplaceTenantsTable', {
+      tableName: 'meddigtwin-marketplace-tenants',
+      partitionKey: { name: 'tenant_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecovery: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     const environment = (this.node.tryGetContext('environment') as string) || 'demo';
 
     const cluster = new ecs.Cluster(this, 'MedDigtwinCluster', {
@@ -115,6 +127,8 @@ export class MedDigtwinStack extends cdk.Stack {
         OIDC_JWKS_URL: cdk.Fn.sub('https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}/.well-known/jwks.json'),
         DDB_SIMULATIONS_TABLE: simulationsTable.tableName,
         DDB_AUDIT_TABLE: auditTable.tableName,
+        MARKETPLACE_TENANTS_TABLE: marketplaceTenantsTable.tableName,
+        AWS_MARKETPLACE_PRODUCT_CODE: marketplaceProductCode || '',
         AWS_REGION: cdk.Aws.REGION,
         AWS_DEFAULT_REGION: cdk.Aws.REGION,
       },
@@ -130,11 +144,16 @@ export class MedDigtwinStack extends cdk.Stack {
 
     simulationsTable.grantReadWriteData(taskRole);
     auditTable.grantReadWriteData(taskRole);
+    marketplaceTenantsTable.grantReadWriteData(taskRole);
+    taskRole.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: ['aws-marketplace:ResolveCustomer', 'aws-marketplace:GetEntitlements'],
+      resources: ['*'],
+    }));
 
     const service = new ecs.FargateService(this, 'MedDigtwinApiService', {
       cluster,
       taskDefinition,
-      desiredCount: 0,
+      desiredCount: environment === 'production' ? 2 : 0,
       assignPublicIp: false,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
@@ -216,6 +235,8 @@ export class MedDigtwinStack extends cdk.Stack {
     if (domainName) {
       new cdk.CfnOutput(this, 'ConfiguredDomain', { value: domainName });
     }
+
+    new cdk.CfnOutput(this, 'MarketplaceTenantsTableName', { value: marketplaceTenantsTable.tableName });
 
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
