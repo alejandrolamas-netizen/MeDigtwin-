@@ -114,7 +114,7 @@ jobs:
 
       - name: Activate API service
         run: |
-          aws ecs update-service             --cluster "$ECS_CLUSTER"             --service "$ECS_SERVICE"             --task-definition "$TASK_DEFINITION"             --desired-count 1             --region "$AWS_REGION"
+          aws ecs update-service             --cluster "$ECS_CLUSTER"             --service "$ECS_SERVICE"             --task-definition "$TASK_DEFINITION"             --desired-count 2             --region "$AWS_REGION"
 
       - name: Wait for ECS service stability
         run: |
