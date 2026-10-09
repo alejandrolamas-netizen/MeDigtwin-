@@ -192,7 +192,9 @@ export class MedDigtwinStack extends cdk.Stack {
     const service = new ecs.FargateService(this, 'MedDigtwinApiService', {
       cluster,
       taskDefinition,
-      desiredCount: environment === 'production' ? 2 : 0,
+      // Start with zero tasks: the deployment workflow pushes the first image after CDK creates the service.
+      // The workflow scales the service only after registering the immutable image task definition.
+      desiredCount: 0,
       assignPublicIp: false,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
