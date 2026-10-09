@@ -103,6 +103,19 @@ app = FastAPI(
     description="Synthetic healthcare operational simulation API.",
 )
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Apply defensive response headers to API and documentation responses."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Cache-Control", "no-store")
+    if os.getenv("ENVIRONMENT", "demo") == "production":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 BASELINE = {
     "arrivals_per_day": 428,
     "bed_occupancy_pct": 82,
