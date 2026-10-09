@@ -154,7 +154,7 @@ export class MedDigtwinStack extends cdk.Stack {
         AWS_MARKETPLACE_PRODUCT_CODE: marketplaceProductCode || '',
         AWS_REGION: cdk.Aws.REGION,
         AWS_DEFAULT_REGION: cdk.Aws.REGION,
-        CLAUDE_ENABLED: 'false',
+        CLAUDE_ENABLED: ((this.node.tryGetContext('claudeEnabled') as string | undefined) || 'false') === 'true' && Boolean(anthropicSecretArn) && Boolean((this.node.tryGetContext('claudeModel') as string | undefined)) ? 'true' : 'false',
         CLAUDE_QUOTA_TABLE: claudeQuotaTable.tableName,
         CLAUDE_MODEL: (this.node.tryGetContext('claudeModel') as string | undefined) || '',
         CLAUDE_MONTHLY_REQUEST_LIMIT: '50',
