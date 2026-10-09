@@ -116,6 +116,7 @@ jobs:
           MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
           CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
           DOMAIN_NAME: ${{ inputs.domain_name }}
+          FRONTEND_ORIGIN: ${{ inputs.frontend_origin }}
           ANTHROPIC_SECRET_ARN: ${{ inputs.anthropic_secret_arn }}
           CLAUDE_MODEL: ${{ inputs.claude_model }}
         run: |
@@ -126,6 +127,7 @@ jobs:
             -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
             -c certificateArn="$CERTIFICATE_ARN" \
             -c domainName="$DOMAIN_NAME" \
+            -c corsOrigins="$FRONTEND_ORIGIN" \
             -c anthropicSecretArn="$ANTHROPIC_SECRET_ARN" \
             -c claudeModel="$CLAUDE_MODEL" \
             -c claudeEnabled="$CLAUDE_ENABLED"
