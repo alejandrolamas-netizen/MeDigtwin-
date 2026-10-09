@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="MedDigtwin Twin Analyst — Claude scenario analysis using synthetic data">
+<title>Twin Analyst | MedDigtwin</title>
+<style>
+:root{color-scheme:dark;--bg:#071018;--panel:#0c1721;--line:#1c3445;--text:#e8f1f7;--muted:#8da4b5;--blue:#4aa3ff;--green:#48d597;--amber:#f3b95f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 75% 0,#12304a 0,#071018 45%,#050b10 100%);color:var(--text);font:16px/1.5 system-ui,sans-serif}.wrap{max-width:900px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:18px}.brand{font-weight:750;font-size:20px}.muted{color:var(--muted)}.pill{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:18px}h1{font-size:clamp(28px,5vw,42px);line-height:1.1;margin:22px 0 8px}h2{font-size:18px;margin:0 0 14px}label{display:block;color:var(--muted);font-size:13px;margin:14px 0 6px}input,textarea,select{width:100%;border:1px solid var(--line);background:#071018;color:var(--text);border-radius:8px;padding:11px;font:inherit}textarea{min-height:90px;resize:vertical}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.btn{background:#14568a;border:1px solid #287ab8;color:white;border-radius:8px;padding:11px 16px;font-weight:650;cursor:pointer}.btn:disabled{opacity:.55;cursor:wait}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}.status{padding:12px;border-radius:8px;background:#101e2a;border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere}.result{white-space:pre-wrap;overflow-wrap:anywhere}.warn{color:var(--amber)}.safe{font-size:12px;color:var(--muted)}a{color:#83c4ff}@media(max-width:600px){.wrap{padding:14px}.grid{grid-template-columns:1fr}.card{padding:15px}}
+</style>
+</head>
+<body><main class="wrap">
+<header class="top"><div><div class="brand">MedDigtwin <span class="muted">/ Twin Analyst</span></div><div class="muted">EmergentSoft · Healthcare operations simulation</div></div><span class="pill">SYNTHETIC DATA ONLY</span></header>
+<h1>Claude scenario analysis</h1><p class="muted">Submit a synthetic operational scenario for a structured analysis. This page does not make clinical decisions and does not connect to a hospital system.</p>
+<section class="card"><h2>Scenario inputs</h2>
+<div class="grid">
+<div><label for="demand">Patient demand (% of baseline)</label><input id="demand" type="number" min="60" max="150" value="120"></div>
+<div><label for="nursing">Nursing availability (% of baseline)</label><input id="nursing" type="number" min="50" max="120" value="90"></div>
+<div><label for="icu">ICU capacity (% of baseline)</label><input id="icu" type="number" min="60" max="140" value="100"></div>
+<div><label for="lab">Laboratory throughput (% of baseline)</label><input id="lab" type="number" min="60" max="140" value="100"></div>
+</div>
+<label for="question">Question for the analyst</label><textarea id="question">Identify likely operational bottlenecks, explain the trade-offs, and suggest low-risk scenarios to compare. State assumptions and uncertainty.</textarea>
+<div class="row"><button id="analyze" class="btn">Analyze scenario with Claude</button><span id="status" class="muted" role="status" aria-live="polite">Waiting for request</span></div>
+<p class="safe">Safety: use synthetic data only. Do not enter patient names, identifiers, clinical records, or other sensitive information. Recommendations are illustrative and require human review.</p></section>
+<section class="card" aria-live="polite"><h2>Analysis results</h2><div id="result" class="result muted">Your analysis will appear here after a successful backend response.</div></section>
+<section class="card"><h2>Connection status</h2><div id="connection" class="status">The page sends requests to the same-origin endpoint /api/v1/analysis/claude. A protected backend and server-side ANTHROPIC_API_KEY are required. The API key must never be placed in browser code.</div><p class="safe">If the endpoint is not deployed, the page will show a connection error rather than simulate or fabricate a Claude response.</p><p><a href="./index.html">← Back to MedDigtwin</a></p></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const endpoint="/api/v1/analysis/claude";
+$("analyze").addEventListener("click",async()=>{
+ const button=$("analyze"),status=$("status"),result=$("result"),connection=$("connection");
+ const fields=[["patient_demand_pct","demand",60,150],["nursing_availability_pct","nursing",50,120],["icu_capacity_pct","icu",60,140],["laboratory_throughput_pct","lab",60,140]];
+ const scenario={};
+ for(const [key,id,min,max] of fields){const el=$(id),v=Number(el.value);if(!Number.isFinite(v)||v<min||v>max){status.textContent="Invalid input";el.focus();return}scenario[key]=v}
+ const question=$("question").value.trim();if(!question){status.textContent="Enter a question for the analyst";return}
+ button.disabled=true;status.textContent="Requesting analysis…";result.textContent="Waiting for backend response…";result.className="result muted";
+ try{
+  const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenario,question,synthetic_data:true})});
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(body.detail||body.error||("Backend returned HTTP "+response.status));
+  const answer=body.analysis||body.answer||body.content;
+  if(typeof answer!=="string"||!answer.trim())throw new Error("Backend responded but did not return analysis text. Expected analysis, answer, or content.");
+  result.textContent=answer;result.className="result";status.textContent="Analysis received";connection.textContent="Backend responded successfully. Confirm server logs and provider metadata to verify the response was generated by Anthropic.";
+ }catch(error){status.textContent="Analysis unavailable";result.textContent="No Claude analysis was returned. "+error.message;result.className="result warn";connection.textContent="Connection failed or backend contract is not configured. Expected POST "+endpoint+" with a protected server-side Anthropic integration. No result has been fabricated."}
+ finally{button.disabled=false}
+});
+</script></body></html>
