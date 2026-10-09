@@ -5,6 +5,10 @@ on:
     inputs:
       environment:
         description: Deployment environment
+        type: choice
+        options:
+          - staging
+          - production
         required: true
         default: production
       marketplace_product_code:
@@ -16,12 +20,18 @@ on:
       domain_name:
         description: Public MedDigtwin domain
         required: false
-  push:
-    branches: [main]
-    paths:
-      - "infra/cdk/**"
-      - ".github/workflows/deploy-infra.yml"
+      frontend_origin:
+        description: Comma-separated HTTPS origins allowed to call the API from a browser
+        required: false
+      anthropic_secret_arn:
+        description: Optional AWS Secrets Manager ARN for the Anthropic API key; never enter the key itself
+        required: false
+      claude_model:
+        description: Anthropic model identifier; required with the secret ARN to enable Twin Analyst
+        required: false
 
+# Deployment is intentionally manual-only. Protect the production GitHub
+# Environment with required reviewers and configure AWS OIDC trust narrowly.
 permissions:
   id-token: write
   contents: read
@@ -35,15 +45,10 @@ env:
 jobs:
   deploy-infra:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN || vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Validate AWS role configuration
         env:
@@ -55,6 +60,12 @@ jobs:
             exit 1
           fi
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN || vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Verify AWS identity
         run: aws sts get-caller-identity
 
@@ -62,12 +73,10 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: infra/cdk/package-lock.json
 
       - name: Install dependencies
         working-directory: infra/cdk
-        run: npm ci
+        run: npm install
 
       - name: Build CDK
         working-directory: infra/cdk
@@ -79,21 +88,49 @@ jobs:
 
       - name: Synth
         working-directory: infra/cdk
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
+          CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
+          FRONTEND_ORIGIN: ${{ inputs.frontend_origin }}
+          ANTHROPIC_SECRET_ARN: ${{ inputs.anthropic_secret_arn }}
+          CLAUDE_MODEL: ${{ inputs.claude_model }}
         run: |
+          CLAUDE_ENABLED=false
+          if [ -n "$ANTHROPIC_SECRET_ARN" ] && [ -n "$CLAUDE_MODEL" ]; then CLAUDE_ENABLED=true; fi
           npx cdk synth \
-            -c environment="${{ inputs.environment || 'production' }}" \
-            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
-            -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}"
+            -c environment="$DEPLOY_ENVIRONMENT" \
+            -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
+            -c certificateArn="$CERTIFICATE_ARN" \
+            -c domainName="$DOMAIN_NAME" \
+            -c corsOrigins="$FRONTEND_ORIGIN" \
+            -c anthropicSecretArn="$ANTHROPIC_SECRET_ARN" \
+            -c claudeModel="$CLAUDE_MODEL" \
+            -c claudeEnabled="$CLAUDE_ENABLED"
 
       - name: Deploy
         working-directory: infra/cdk
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
+          CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
+          FRONTEND_ORIGIN: ${{ inputs.frontend_origin }}
+          ANTHROPIC_SECRET_ARN: ${{ inputs.anthropic_secret_arn }}
+          CLAUDE_MODEL: ${{ inputs.claude_model }}
         run: |
+          CLAUDE_ENABLED=false
+          if [ -n "$ANTHROPIC_SECRET_ARN" ] && [ -n "$CLAUDE_MODEL" ]; then CLAUDE_ENABLED=true; fi
           npx cdk deploy --require-approval never \
-            -c environment="${{ inputs.environment || 'production' }}" \
-            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
-            -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}"
+            -c environment="$DEPLOY_ENVIRONMENT" \
+            -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
+            -c certificateArn="$CERTIFICATE_ARN" \
+            -c domainName="$DOMAIN_NAME" \
+            -c corsOrigins="$FRONTEND_ORIGIN" \
+            -c anthropicSecretArn="$ANTHROPIC_SECRET_ARN" \
+            -c claudeModel="$CLAUDE_MODEL" \
+            -c claudeEnabled="$CLAUDE_ENABLED"
 
       - name: Verify deployed stack
         run: aws cloudformation describe-stacks --stack-name MedDigtwinStack --query "Stacks[0].StackStatus" --output text
@@ -113,19 +150,34 @@ jobs:
         env:
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
-          aws ecs describe-task-definition             --task-definition meddigtwin-api             --region "$AWS_REGION"             --query taskDefinition > /tmp/task-definition.json
+          aws ecs describe-task-definition \
+            --task-definition meddigtwin-api \
+            --region "$AWS_REGION" \
+            --query taskDefinition > /tmp/task-definition.json
 
-          jq --arg IMAGE "$IMAGE"             'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
-             | .containerDefinitions[0].image=$IMAGE'             /tmp/task-definition.json > /tmp/task-definition-rendered.json
+          jq --arg IMAGE "$IMAGE" \
+            'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+             | .containerDefinitions[0].image=$IMAGE' \
+            /tmp/task-definition.json > /tmp/task-definition-rendered.json
 
-          aws ecs register-task-definition             --cli-input-json file:///tmp/task-definition-rendered.json             --region "$AWS_REGION" > /tmp/registered.json
+          aws ecs register-task-definition \
+            --cli-input-json file:///tmp/task-definition-rendered.json \
+            --region "$AWS_REGION" > /tmp/registered.json
 
           echo "TASK_DEFINITION=$(jq -r '.taskDefinition.taskDefinitionArn' /tmp/registered.json)" >> "$GITHUB_ENV"
 
       - name: Activate API service
         run: |
-          aws ecs update-service             --cluster "$ECS_CLUSTER"             --service "$ECS_SERVICE"             --task-definition "$TASK_DEFINITION"             --desired-count 2             --region "$AWS_REGION"
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$TASK_DEFINITION" \
+            --desired-count 2 \
+            --region "$AWS_REGION"
 
       - name: Wait for ECS service stability
         run: |
-          aws ecs wait services-stable             --cluster "$ECS_CLUSTER"             --services "$ECS_SERVICE"             --region "$AWS_REGION"
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"

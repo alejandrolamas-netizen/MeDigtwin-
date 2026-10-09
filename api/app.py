@@ -8,6 +8,7 @@ from pathlib import Path
 import boto3
 
 from fastapi import FastAPI, Header, HTTPException, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient, decode as jwt_decode
 from pydantic import BaseModel, Field
@@ -103,6 +104,22 @@ app = FastAPI(
     title="MedDigtwin API",
     version="0.1.0",
     description="Synthetic healthcare operational simulation API.",
+)
+
+# Cross-origin access is fail-closed: operators must explicitly configure frontend origins.
+# Never use wildcard origins for an authenticated API.
+_cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Tenant-Id"],
+    max_age=600,
 )
 
 @app.middleware("http")

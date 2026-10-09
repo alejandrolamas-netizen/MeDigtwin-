@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "api/**"
+      - "infra/cdk/**"
       - "index.html"
       - ".github/workflows/ci.yml"
 
@@ -42,3 +43,25 @@ jobs:
 
       - name: Build API container
         run: docker build -t meddigtwin-api:ci ./api
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/cdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install infrastructure dependencies
+        run: npm install
+
+      - name: Compile CDK TypeScript
+        run: npm run build
+
+      - name: Synthesize demo infrastructure template
+        run: npx cdk synth -c environment=demo -c claudeEnabled=false
