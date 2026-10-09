@@ -26,6 +26,17 @@ jobs:
       - name: Install API dependencies
         run: pip install -r api/requirements.txt
 
+      - name: Install test runner
+        run: pip install pytest
+
+      - name: Run API tests
+        run: PYTHONPATH=. python -m pytest api/tests -q
+
+      - name: Check browser JavaScript syntax
+        run: |
+          python -c "from pathlib import Path; import re; s=Path('index.html').read_text(); scripts=re.findall(r'<script>(.*?)</script>', s, re.S); assert scripts, 'No inline JavaScript found'; Path('/tmp/meddigtwin-inline.js').write_text(scripts[-1])"
+          node --check /tmp/meddigtwin-inline.js
+
       - name: Compile API
         run: python -m compileall -q api
 

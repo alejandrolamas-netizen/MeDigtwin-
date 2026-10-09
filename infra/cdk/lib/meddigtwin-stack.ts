@@ -10,6 +10,7 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 
 export class MedDigtwinStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -51,6 +52,12 @@ export class MedDigtwinStack extends cdk.Stack {
     const userPoolClient = userPool.addClient('MedDigtwinWebClient', {
       generateSecret: false,
       authFlows: { userPassword: true, userSrp: true },
+      // The browser client may read identity claims but cannot self-assign tenant or role.
+      readAttributes: new cognito.ClientAttributes()
+        .withStandardAttributes({ email: true })
+        .withCustomAttributes('tenant_id', 'role'),
+      writeAttributes: new cognito.ClientAttributes()
+        .withStandardAttributes({ email: true }),
     });
 
     const simulationsTable = new dynamodb.Table(this, 'MedDigtwinSimulationsTable', {
@@ -73,6 +80,22 @@ export class MedDigtwinStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+
+    const claudeQuotaTable = new dynamodb.Table(this, 'MedDigtwinClaudeQuotaTable', {
+      tableName: 'meddigtwin-claude-quota',
+      partitionKey: { name: 'tenant_id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'period_key', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecovery: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    // Optional secret ARN supplied through CDK context. The feature remains disabled by default.
+    const anthropicSecretArn = this.node.tryGetContext('anthropicSecretArn') as string | undefined;
+    const anthropicSecret = anthropicSecretArn
+      ? secretsmanager.Secret.fromSecretCompleteArn(this, 'AnthropicApiKeySecret', anthropicSecretArn)
+      : undefined;
 
     const marketplaceProductCode = this.node.tryGetContext('marketplaceProductCode') as string | undefined;
 
@@ -131,7 +154,15 @@ export class MedDigtwinStack extends cdk.Stack {
         AWS_MARKETPLACE_PRODUCT_CODE: marketplaceProductCode || '',
         AWS_REGION: cdk.Aws.REGION,
         AWS_DEFAULT_REGION: cdk.Aws.REGION,
+        CLAUDE_ENABLED: 'false',
+        CLAUDE_QUOTA_TABLE: claudeQuotaTable.tableName,
+        CLAUDE_MODEL: (this.node.tryGetContext('claudeModel') as string | undefined) || '',
+        CLAUDE_MONTHLY_REQUEST_LIMIT: '50',
+        CLAUDE_MAX_OUTPUT_TOKENS: '600',
       },
+      secrets: anthropicSecret ? {
+        ANTHROPIC_API_KEY: ecs.Secret.fromSecretsManager(anthropicSecret),
+      } : undefined,
       portMappings: [{ containerPort: 8000 }],
       healthCheck: {
         command: ['CMD-SHELL', "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""],
@@ -145,6 +176,10 @@ export class MedDigtwinStack extends cdk.Stack {
     simulationsTable.grantReadWriteData(taskRole);
     auditTable.grantReadWriteData(taskRole);
     marketplaceTenantsTable.grantReadWriteData(taskRole);
+    claudeQuotaTable.grantReadWriteData(taskRole);
+    if (anthropicSecret) {
+      anthropicSecret.grantRead(executionRole);
+    }
     taskRole.addToPrincipalPolicy(new iam.PolicyStatement({
       actions: ['aws-marketplace:ResolveCustomer', 'aws-marketplace:GetEntitlements'],
       resources: ['*'],

@@ -1,38 +1,33 @@
 # Security Policy — MedDigtwin
 
-## Scope
+## Scope and data boundary
 
-MedDigtwin is an EmergentSoft Corporation product for healthcare operational simulation. The current product environment uses synthetic data.
+MedDigtwin is an EmergentSoft Corporation healthcare **operational simulation** prototype. The demo is intended for synthetic data only. It is not a medical device or clinical decision-support system.
 
-## Security posture
+Do not submit patient-identifiable information, protected health information, production clinical datasets, credentials, API keys, access tokens, private keys, or exploit payloads that could harm a live service in public issues or pull requests.
 
-The AWS-ready architecture uses:
+## Reporting a vulnerability
 
-- IAM least privilege
-- ECS/Fargate task isolation
-- ECR image scanning
-- Cognito-based identity
-- Tenant-scoped authorization
-- DynamoDB encryption and point-in-time recovery
-- CloudWatch logging
-- AWS WAF
-- Optional ACM TLS
-- GitHub Actions OIDC instead of long-lived AWS access keys
+Please do not disclose exploitable vulnerabilities in a public issue. Use GitHub's repository **Security → Advisories → Report a vulnerability** feature if private vulnerability reporting is enabled. If it is unavailable, contact EmergentSoft through its official company contact channel and request a private security-reporting route. Do not include secrets or personal/health information in the report.
 
-## Data boundary
+Include:
+- affected component and commit/version;
+- impact and preconditions;
+- minimal reproduction steps using synthetic data and without disrupting a service;
+- suggested mitigation, if known.
 
-Do not submit patient-identifiable information, protected health information, production clinical datasets, credentials, API keys or access tokens to the current demo/prototype.
+Target response times are acknowledgment within 5 business days and initial triage within 10 business days. These are goals, not guarantees.
 
-A deployment that processes real healthcare information requires a separate security, privacy, compliance and data-governance assessment.
+## Exposed credentials
 
-## Reporting
+If a credential may have been exposed, revoke it immediately, issue a replacement through the provider, inspect provider access logs, and assess potential misuse. Removing the value from the latest commit is not enough; history may still contain it.
 
-Potential security issues should be reported privately to EmergentSoft Corporation through the official company contact channel. Do not publish credentials, exploit instructions or sensitive healthcare data in public issues.
+## Safe-harbor expectations
 
-## Product limitation
+Testing must be authorized, limited in scope, and avoid accessing real data, degrading services, persistence, or lateral movement. Stop if you encounter real personal or health information and report it privately.
 
-AWS-ready does not mean clinically validated, regulatory certified or authorized to process regulated health information.
+## Product limitations
 
-MedDigtwin is an operational simulation product and is not a clinical diagnosis or treatment system.
+An AWS-ready architecture or passing automated scan is not a security certification, clinical validation, or proof of HIPAA, ISO 27001, or SOC 2 compliance. Any deployment handling real healthcare information requires separate security, privacy, legal, and data-governance review.
 
 © 2026 EmergentSoft Corporation.
