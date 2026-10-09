@@ -10,7 +10,9 @@ COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r requirements.txt \
     && groupadd --system app \
-    && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app
+    && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app \
+    && mkdir -p /app/data \
+    && chown app:app /app/data
 
 COPY --chown=app:app app.py ./
 
