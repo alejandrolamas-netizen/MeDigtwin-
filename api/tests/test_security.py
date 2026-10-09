@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi import HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from api import app as api
@@ -47,3 +48,14 @@ def test_production_authentication_requires_bearer_token(
 
     assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
     assert exc.value.detail == "Bearer token required"
+
+
+def test_cors_is_explicit_origin_only() -> None:
+    cors = [middleware for middleware in api.app.user_middleware if middleware.cls is CORSMiddleware]
+
+    assert len(cors) == 1
+    options = cors[0].kwargs
+    assert options["allow_origins"] == []
+    assert options["allow_credentials"] is False
+    assert "Authorization" in options["allow_headers"]
+    assert "OPTIONS" in options["allow_methods"]
