@@ -20,6 +20,12 @@ on:
       domain_name:
         description: Public MedDigtwin domain
         required: false
+      anthropic_secret_arn:
+        description: Optional AWS Secrets Manager ARN for the Anthropic API key; never enter the key itself
+        required: false
+      claude_model:
+        description: Anthropic model identifier; required with the secret ARN to enable Twin Analyst
+        required: false
 
 # Deployment is intentionally manual-only. Protect the production GitHub
 # Environment with required reviewers and configure AWS OIDC trust narrowly.
@@ -86,7 +92,10 @@ jobs:
             -c environment="${{ inputs.environment || 'production' }}" \
             -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
             -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}"
+            -c domainName="${{ inputs.domain_name }}" \\
+            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \\
+            -c claudeModel="${{ inputs.claude_model }}" \\
+            -c claudeEnabled="${{ inputs.anthropic_secret_arn != '' && inputs.claude_model != '' }}"
 
       - name: Deploy
         working-directory: infra/cdk
@@ -95,7 +104,10 @@ jobs:
             -c environment="${{ inputs.environment || 'production' }}" \
             -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
             -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}"
+            -c domainName="${{ inputs.domain_name }}" \\
+            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \\
+            -c claudeModel="${{ inputs.claude_model }}" \\
+            -c claudeEnabled="${{ inputs.anthropic_secret_arn != '' && inputs.claude_model != '' }}"
 
       - name: Verify deployed stack
         run: aws cloudformation describe-stacks --stack-name MedDigtwinStack --query "Stacks[0].StackStatus" --output text
