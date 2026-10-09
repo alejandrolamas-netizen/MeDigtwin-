@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 import os
 from uuid import uuid4
 from pathlib import Path
@@ -13,8 +14,9 @@ from pydantic import BaseModel, Field
 import json
 
 
+logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer(auto_error=False)
-DATA_DIR = Path(os.getenv('DATA_DIR', '/tmp/meddigtwin-data'))
+DATA_DIR = Path(os.getenv('DATA_DIR', str(Path(__file__).resolve().parent / 'data')))
 AUDIT_FILE = DATA_DIR / 'audit.jsonl'
 SIMULATIONS_TABLE = os.getenv('DDB_SIMULATIONS_TABLE')
 AUDIT_TABLE = os.getenv('DDB_AUDIT_TABLE')
@@ -487,5 +489,6 @@ def analyze_twin(
                 "outcome": "provider_error",
             })
         except Exception:
-            pass
+            # Preserve the generic provider error response without hiding audit-log failures.
+            logger.warning("Failed to write provider failure audit event")
         raise HTTPException(status_code=502, detail="Twin Analyst provider request failed") from exc
