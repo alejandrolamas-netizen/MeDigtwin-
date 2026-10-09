@@ -16,7 +16,7 @@ import json
 
 logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer(auto_error=False)
-DATA_DIR = Path(os.getenv('DATA_DIR', str(Path(__file__).resolve().parent / 'data')))
+DATA_DIR = Path(os.getenv('DATA_DIR', str(Path.home() / '.local' / 'share' / 'meddigtwin-data')))
 AUDIT_FILE = DATA_DIR / 'audit.jsonl'
 SIMULATIONS_TABLE = os.getenv('DDB_SIMULATIONS_TABLE')
 AUDIT_TABLE = os.getenv('DDB_AUDIT_TABLE')
