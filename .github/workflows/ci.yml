@@ -26,6 +26,12 @@ jobs:
       - name: Install API dependencies
         run: pip install -r api/requirements.txt
 
+      - name: Install test runner
+        run: pip install pytest
+
+      - name: Run API tests
+        run: PYTHONPATH=. python -m pytest api/tests -q
+
       - name: Compile API
         run: python -m compileall -q api
 
