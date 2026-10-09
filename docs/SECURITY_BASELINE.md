@@ -38,7 +38,7 @@
 
 ## 5. CI/CD controls
 
-The proposed workflows run Gitleaks, pip-audit, Bandit, CodeQL, and dependency review. Treat findings as release blockers until triaged and documented. Scheduled scans are not a substitute for reviewing each change.
+The proposed workflows run Gitleaks, pip-audit, Bandit, and CodeQL. Dependency review can be added once the repository administrator enables GitHub's dependency graph; it is currently not supported by the repository settings. Treat findings as release blockers until triaged and documented. Scheduled scans are not a substitute for reviewing each change.
 
 For production, also configure:
 - required status checks and at least one approval (or documented owner review for a single-maintainer project);
