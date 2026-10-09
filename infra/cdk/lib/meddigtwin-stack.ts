@@ -91,9 +91,13 @@ export class MedDigtwinStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
-    // Optional secret ARN supplied through CDK context. The feature remains disabled by default.
+    // Claude remains disabled unless both provider settings are supplied explicitly.
     const anthropicSecretArn = this.node.tryGetContext('anthropicSecretArn') as string | undefined;
-    const anthropicSecret = anthropicSecretArn
+    const claudeModel = (this.node.tryGetContext('claudeModel') as string | undefined) || '';
+    const claudeEnabled = ((this.node.tryGetContext('claudeEnabled') as string | undefined) || 'false') === 'true'
+      && Boolean(anthropicSecretArn)
+      && Boolean(claudeModel);
+    const anthropicSecret = claudeEnabled && anthropicSecretArn
       ? secretsmanager.Secret.fromSecretCompleteArn(this, 'AnthropicApiKeySecret', anthropicSecretArn)
       : undefined;
 
@@ -154,9 +158,9 @@ export class MedDigtwinStack extends cdk.Stack {
         AWS_MARKETPLACE_PRODUCT_CODE: marketplaceProductCode || '',
         AWS_REGION: cdk.Aws.REGION,
         AWS_DEFAULT_REGION: cdk.Aws.REGION,
-        CLAUDE_ENABLED: ((this.node.tryGetContext('claudeEnabled') as string | undefined) || 'false') === 'true' && Boolean(anthropicSecretArn) && Boolean((this.node.tryGetContext('claudeModel') as string | undefined)) ? 'true' : 'false',
+        CLAUDE_ENABLED: claudeEnabled ? 'true' : 'false',
         CLAUDE_QUOTA_TABLE: claudeQuotaTable.tableName,
-        CLAUDE_MODEL: (this.node.tryGetContext('claudeModel') as string | undefined) || '',
+        CLAUDE_MODEL: claudeModel,
         CLAUDE_MONTHLY_REQUEST_LIMIT: '50',
         CLAUDE_MAX_OUTPUT_TOKENS: '600',
       },
