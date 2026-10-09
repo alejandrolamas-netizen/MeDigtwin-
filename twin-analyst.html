@@ -23,11 +23,11 @@
 <div class="row"><button id="analyze" class="btn">Analyze scenario with Claude</button><span id="status" class="muted" role="status" aria-live="polite">Waiting for request</span></div>
 <p class="safe">Safety: use synthetic data only. Do not enter patient names, identifiers, clinical records, or other sensitive information. Recommendations are illustrative and require human review.</p></section>
 <section class="card" aria-live="polite"><h2>Analysis results</h2><div id="result" class="result muted">Your analysis will appear here after a successful backend response.</div></section>
-<section class="card"><h2>Connection status</h2><div id="connection" class="status">The page sends requests to the same-origin endpoint /api/v1/analysis/claude. A protected backend and server-side ANTHROPIC_API_KEY are required. The API key must never be placed in browser code.</div><p class="safe">If the endpoint is not deployed, the page will show a connection error rather than simulate or fabricate a Claude response.</p><p><a href="./index.html">← Back to MedDigtwin</a></p></section>
+<section class="card"><h2>Connection status</h2><div id="connection" class="status">The page sends requests to the same-origin endpoint /api/v1/twin/analysis. A protected backend and server-side ANTHROPIC_API_KEY are required. The API key must never be placed in browser code.</div><p class="safe">If the endpoint is not deployed, the page will show a connection error rather than simulate or fabricate a Claude response.</p><p><a href="./index.html">← Back to MedDigtwin</a></p></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const endpoint="/api/v1/analysis/claude";
+const endpoint="/api/v1/twin/analysis";
 $("analyze").addEventListener("click",async()=>{
  const button=$("analyze"),status=$("status"),result=$("result"),connection=$("connection");
  const fields=[["patient_demand_pct","demand",60,150],["nursing_availability_pct","nursing",50,120],["icu_capacity_pct","icu",60,140],["laboratory_throughput_pct","lab",60,140]];
@@ -36,7 +36,10 @@ $("analyze").addEventListener("click",async()=>{
  const question=$("question").value.trim();if(!question){status.textContent="Enter a question for the analyst";return}
  button.disabled=true;status.textContent="Requesting analysis…";result.textContent="Waiting for backend response…";result.className="result muted";
  try{
-  const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenario,question,synthetic_data:true})});
+  const headers={"Content-Type":"application/json"};
+  if(window.MEDDIGTWIN_AUTH_TOKEN){headers.Authorization="Bearer "+window.MEDDIGTWIN_AUTH_TOKEN}
+  else if(window.MEDDIGTWIN_DEMO_MODE===true){headers["X-Tenant-Id"]="demo-synthetic"}
+  const response=await fetch(endpoint,{method:"POST",headers,body:JSON.stringify({scenario,question})});
   const body=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(body.detail||body.error||("Backend returned HTTP "+response.status));
   const answer=body.analysis||body.answer||body.content;
