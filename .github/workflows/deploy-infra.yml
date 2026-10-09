@@ -87,27 +87,45 @@ jobs:
 
       - name: Synth
         working-directory: infra/cdk
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
+          CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
+          ANTHROPIC_SECRET_ARN: ${{ inputs.anthropic_secret_arn }}
+          CLAUDE_MODEL: ${{ inputs.claude_model }}
         run: |
+          CLAUDE_ENABLED=false
+          if [ -n "$ANTHROPIC_SECRET_ARN" ] && [ -n "$CLAUDE_MODEL" ]; then CLAUDE_ENABLED=true; fi
           npx cdk synth \
-            -c environment="${{ inputs.environment || 'production' }}" \
-            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
-            -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}" \
-            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \
-            -c claudeModel="${{ inputs.claude_model }}" \
-            -c claudeEnabled="${{ inputs.anthropic_secret_arn != '' && inputs.claude_model != '' }}"
+            -c environment="$DEPLOY_ENVIRONMENT" \
+            -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
+            -c certificateArn="$CERTIFICATE_ARN" \
+            -c domainName="$DOMAIN_NAME" \
+            -c anthropicSecretArn="$ANTHROPIC_SECRET_ARN" \
+            -c claudeModel="$CLAUDE_MODEL" \
+            -c claudeEnabled="$CLAUDE_ENABLED"
 
       - name: Deploy
         working-directory: infra/cdk
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
+          CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
+          ANTHROPIC_SECRET_ARN: ${{ inputs.anthropic_secret_arn }}
+          CLAUDE_MODEL: ${{ inputs.claude_model }}
         run: |
+          CLAUDE_ENABLED=false
+          if [ -n "$ANTHROPIC_SECRET_ARN" ] && [ -n "$CLAUDE_MODEL" ]; then CLAUDE_ENABLED=true; fi
           npx cdk deploy --require-approval never \
-            -c environment="${{ inputs.environment || 'production' }}" \
-            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
-            -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}" \
-            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \
-            -c claudeModel="${{ inputs.claude_model }}" \
-            -c claudeEnabled="${{ inputs.anthropic_secret_arn != '' && inputs.claude_model != '' }}"
+            -c environment="$DEPLOY_ENVIRONMENT" \
+            -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
+            -c certificateArn="$CERTIFICATE_ARN" \
+            -c domainName="$DOMAIN_NAME" \
+            -c anthropicSecretArn="$ANTHROPIC_SECRET_ARN" \
+            -c claudeModel="$CLAUDE_MODEL" \
+            -c claudeEnabled="$CLAUDE_ENABLED"
 
       - name: Verify deployed stack
         run: aws cloudformation describe-stacks --stack-name MedDigtwinStack --query "Stacks[0].StackStatus" --output text
