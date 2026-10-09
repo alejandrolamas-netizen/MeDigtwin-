@@ -1,0 +1,63 @@
+name: Security checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history for secret scanning
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan repository history and working tree
+        uses: gitleaks/gitleaks-action@v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  python-security:
+    name: Python dependency and code checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+      - name: Install dependencies and scanners
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r api/requirements.txt
+          python -m pip install bandit pip-audit
+      - name: Audit Python dependencies
+        run: python -m pip_audit -r api/requirements.txt
+      - name: Static security analysis
+        run: bandit -q -r api -x api/tests
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
