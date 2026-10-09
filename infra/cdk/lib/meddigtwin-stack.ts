@@ -158,6 +158,7 @@ export class MedDigtwinStack extends cdk.Stack {
         AWS_MARKETPLACE_PRODUCT_CODE: marketplaceProductCode || '',
         AWS_REGION: cdk.Aws.REGION,
         AWS_DEFAULT_REGION: cdk.Aws.REGION,
+        CORS_ORIGINS: (this.node.tryGetContext('corsOrigins') as string | undefined) || '',
         CLAUDE_ENABLED: claudeEnabled ? 'true' : 'false',
         CLAUDE_QUOTA_TABLE: claudeQuotaTable.tableName,
         CLAUDE_MODEL: claudeModel,
