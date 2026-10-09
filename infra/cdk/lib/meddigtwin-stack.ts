@@ -52,6 +52,12 @@ export class MedDigtwinStack extends cdk.Stack {
     const userPoolClient = userPool.addClient('MedDigtwinWebClient', {
       generateSecret: false,
       authFlows: { userPassword: true, userSrp: true },
+      // The browser client may read identity claims but cannot self-assign tenant or role.
+      readAttributes: new cognito.ClientAttributes()
+        .withStandardAttributes({ email: true })
+        .withCustomAttributes('tenant_id', 'role'),
+      writeAttributes: new cognito.ClientAttributes()
+        .withStandardAttributes({ email: true }),
     });
 
     const simulationsTable = new dynamodb.Table(this, 'MedDigtwinSimulationsTable', {

@@ -77,3 +77,35 @@ def test_twin_analyst_uses_server_context_and_returns_mocked_answer(monkeypatch)
     assert "synthetic" in calls["system"].lower()
     assert "120" in calls["messages"][0]["content"]
     assert "Explain this scenario" in calls["messages"][0]["content"]
+
+
+def test_api_responses_include_security_headers(monkeypatch):
+    import asyncio
+    from starlette.requests import Request
+    from starlette.responses import Response
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "https",
+        "path": "/health",
+        "raw_path": b"/health",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 443),
+    }
+    request = Request(scope)
+
+    async def call_next(_request):
+        return Response("ok")
+
+    response = asyncio.run(api_module.add_security_headers(request, call_next))
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["strict-transport-security"].startswith("max-age=")
