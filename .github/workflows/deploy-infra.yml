@@ -5,6 +5,10 @@ on:
     inputs:
       environment:
         description: Deployment environment
+        type: choice
+        options:
+          - staging
+          - production
         required: true
         default: production
       marketplace_product_code:
