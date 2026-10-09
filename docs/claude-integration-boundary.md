@@ -22,6 +22,12 @@ Example request:
 
 The endpoint returns a request ID, tenant ID, configured model, explanation, and token usage when the provider supplies it. It does not persist or mutate simulation state.
 
+The `index.html` interface includes a Twin Analyst page. Configure the static page's host application before use:
+- Set `window.MEDDIGTWIN_API_BASE` to the API origin (without a trailing slash).
+- For authenticated use, have the host application's login layer supply a short-lived access token through `window.MEDDIGTWIN_AUTH_TOKEN`; this must be an OIDC access token accepted by the API, never the Anthropic key.
+- Only in an isolated synthetic demo, explicitly set `window.MEDDIGTWIN_DEMO_MODE = true` to send the demo tenant header. Do not enable this for production.
+- The browser must never receive `ANTHROPIC_API_KEY`.
+
 ## Safety and spend controls in this branch
 
 - `CLAUDE_ENABLED` defaults to false; the CDK task environment explicitly sets it to false.
@@ -67,5 +73,6 @@ python -m pytest api/tests/test_twin_analyst.py -q
 - API: `api/app.py`
 - Dependency: `api/requirements.txt`
 - Mocked tests: `api/tests/test_twin_analyst.py`
+- Browser interface: `index.html` (Twin Analyst page)
 - AWS CDK: `infra/cdk/lib/meddigtwin-stack.ts`
 - No claim is made that AWS resources are deployed or that a live Anthropic request has succeeded.
