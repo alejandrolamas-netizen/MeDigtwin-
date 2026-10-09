@@ -92,9 +92,9 @@ jobs:
             -c environment="${{ inputs.environment || 'production' }}" \
             -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
             -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}" \\
-            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \\
-            -c claudeModel="${{ inputs.claude_model }}" \\
+            -c domainName="${{ inputs.domain_name }}" \
+            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \
+            -c claudeModel="${{ inputs.claude_model }}" \
             -c claudeEnabled="${{ inputs.anthropic_secret_arn != '' && inputs.claude_model != '' }}"
 
       - name: Deploy
@@ -104,9 +104,9 @@ jobs:
             -c environment="${{ inputs.environment || 'production' }}" \
             -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
             -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}" \\
-            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \\
-            -c claudeModel="${{ inputs.claude_model }}" \\
+            -c domainName="${{ inputs.domain_name }}" \
+            -c anthropicSecretArn="${{ inputs.anthropic_secret_arn }}" \
+            -c claudeModel="${{ inputs.claude_model }}" \
             -c claudeEnabled="${{ inputs.anthropic_secret_arn != '' && inputs.claude_model != '' }}"
 
       - name: Verify deployed stack
