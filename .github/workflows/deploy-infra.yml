@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: CDK deployment context
+        description: Deployment target (this workflow currently supports production only)
         required: true
         default: production
         type: choice
         options:
-          - staging
           - production
       marketplace_product_code:
         description: AWS Marketplace SaaS Product Code
