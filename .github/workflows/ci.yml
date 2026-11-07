@@ -37,8 +37,10 @@ jobs:
           python -c "from pathlib import Path; import re; s=Path('index.html').read_text(); scripts=re.findall(r'<script>(.*?)</script>', s, re.S); assert scripts, 'No inline JavaScript found'; Path('/tmp/meddigtwin-inline.js').write_text(scripts[-1])"
           node --check /tmp/meddigtwin-inline.js
 
-      - name: Compile API
-        run: python -m compileall -q api
+      - name: Compile API and benchmark harness
+        run: |
+          python -m compileall -q api
+          python -m py_compile tools/benchmark_api.py
 
       - name: Build API container
         run: docker build -t meddigtwin-api:ci ./api
