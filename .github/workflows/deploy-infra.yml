@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Deployment environment
+        description: CDK deployment context
         required: true
         default: production
+        type: choice
+        options:
+          - staging
+          - production
       marketplace_product_code:
         description: AWS Marketplace SaaS Product Code
         required: false
@@ -16,11 +20,6 @@ on:
       domain_name:
         description: Public MedDigtwin domain
         required: false
-  push:
-    branches: [main]
-    paths:
-      - "infra/cdk/**"
-      - ".github/workflows/deploy-infra.yml"
 
 permissions:
   id-token: write
@@ -35,15 +34,10 @@ env:
 jobs:
   deploy-infra:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN || vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Validate AWS role configuration
         env:
@@ -51,15 +45,20 @@ jobs:
         run: |
           if [ -z "$AWS_ROLE_TO_ASSUME" ]; then
             echo "::error::AWS_GITHUB_ACTIONS_ROLE_ARN is not configured as a GitHub Actions secret or repository variable."
-            echo "Configure the IAM role ARN in GitHub repository Settings > Secrets and variables > Actions."
             exit 1
           fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN || vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify AWS identity
         run: aws sts get-caller-identity
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
           cache: npm
@@ -77,11 +76,11 @@ jobs:
         working-directory: infra/cdk
         run: npx cdk bootstrap aws://$(aws sts get-caller-identity --query Account --output text)/${{ env.AWS_REGION }}
 
-      - name: Synth
+      - name: Synthesize
         working-directory: infra/cdk
         run: |
           npx cdk synth \
-            -c environment="${{ inputs.environment || 'production' }}" \
+            -c environment="${{ inputs.environment }}" \
             -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
             -c certificateArn="${{ inputs.certificate_arn }}" \
             -c domainName="${{ inputs.domain_name }}"
@@ -89,8 +88,8 @@ jobs:
       - name: Deploy
         working-directory: infra/cdk
         run: |
-          npx cdk deploy --require-approval never \
-            -c environment="${{ inputs.environment || 'production' }}" \
+          npx cdk deploy --require-approval broadening \
+            -c environment="${{ inputs.environment }}" \
             -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
             -c certificateArn="${{ inputs.certificate_arn }}" \
             -c domainName="${{ inputs.domain_name }}"
@@ -113,19 +112,34 @@ jobs:
         env:
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
-          aws ecs describe-task-definition             --task-definition meddigtwin-api             --region "$AWS_REGION"             --query taskDefinition > /tmp/task-definition.json
+          aws ecs describe-task-definition \
+            --task-definition meddigtwin-api \
+            --region "$AWS_REGION" \
+            --query taskDefinition > /tmp/task-definition.json
 
-          jq --arg IMAGE "$IMAGE"             'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
-             | .containerDefinitions[0].image=$IMAGE'             /tmp/task-definition.json > /tmp/task-definition-rendered.json
+          jq --arg IMAGE "$IMAGE" \
+            'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+             | .containerDefinitions[0].image=$IMAGE' \
+            /tmp/task-definition.json > /tmp/task-definition-rendered.json
 
-          aws ecs register-task-definition             --cli-input-json file:///tmp/task-definition-rendered.json             --region "$AWS_REGION" > /tmp/registered.json
+          aws ecs register-task-definition \
+            --cli-input-json file:///tmp/task-definition-rendered.json \
+            --region "$AWS_REGION" > /tmp/registered.json
 
           echo "TASK_DEFINITION=$(jq -r '.taskDefinition.taskDefinitionArn' /tmp/registered.json)" >> "$GITHUB_ENV"
 
       - name: Activate API service
         run: |
-          aws ecs update-service             --cluster "$ECS_CLUSTER"             --service "$ECS_SERVICE"             --task-definition "$TASK_DEFINITION"             --desired-count 2             --region "$AWS_REGION"
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$TASK_DEFINITION" \
+            --desired-count 2 \
+            --region "$AWS_REGION"
 
       - name: Wait for ECS service stability
         run: |
-          aws ecs wait services-stable             --cluster "$ECS_CLUSTER"             --services "$ECS_SERVICE"             --region "$AWS_REGION"
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"
