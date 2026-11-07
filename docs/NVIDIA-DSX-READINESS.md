@@ -56,3 +56,19 @@ These are candidate integration points, not existing capabilities.
 ## External representation
 
 Describe this as an engineering prototype and an integration-ready exploration. Do not claim NVIDIA certification, partnership, endorsement, or production DSX integration unless separately confirmed.
+
+## API load-probe harness
+
+A dependency-free HTTP load probe is available at `tools/benchmark_api.py`. It posts a fixed synthetic scenario to `/api/v1/simulations` and records client-observed latency percentiles, throughput, status counts and errors as JSON.
+
+Example (against an isolated synthetic environment only):
+
+```bash
+python tools/benchmark_api.py \\
+  --base-url http://127.0.0.1:8000 \\
+  --requests 200 \\
+  --concurrency 10 \\
+  --output benchmark-results/local-api.json
+```
+
+This is an API service load probe, not a GPU benchmark. The current `run_model` implementation is deterministic arithmetic; it does not contain a GPU inference workload. GPU-related claims require a separately implemented model-backed workload and measurements on identified GPU hardware. Keep raw result files with the commit SHA, container digest and environment manifest.
