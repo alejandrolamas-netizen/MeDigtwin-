@@ -75,21 +75,31 @@ jobs:
 
       - name: Synthesize
         working-directory: infra/cdk
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
+          CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
         run: |
           npx cdk synth \
-            -c environment="${{ inputs.environment }}" \
-            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
-            -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}"
+            -c environment="$DEPLOY_ENVIRONMENT" \
+            -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
+            -c certificateArn="$CERTIFICATE_ARN" \
+            -c domainName="$DOMAIN_NAME"
 
       - name: Deploy
         working-directory: infra/cdk
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          MARKETPLACE_PRODUCT_CODE: ${{ inputs.marketplace_product_code }}
+          CERTIFICATE_ARN: ${{ inputs.certificate_arn }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
         run: |
           npx cdk deploy --require-approval broadening \
-            -c environment="${{ inputs.environment }}" \
-            -c marketplaceProductCode="${{ inputs.marketplace_product_code }}" \
-            -c certificateArn="${{ inputs.certificate_arn }}" \
-            -c domainName="${{ inputs.domain_name }}"
+            -c environment="$DEPLOY_ENVIRONMENT" \
+            -c marketplaceProductCode="$MARKETPLACE_PRODUCT_CODE" \
+            -c certificateArn="$CERTIFICATE_ARN" \
+            -c domainName="$DOMAIN_NAME"
 
       - name: Verify deployed stack
         run: aws cloudformation describe-stacks --stack-name MedDigtwinStack --query "Stacks[0].StackStatus" --output text
