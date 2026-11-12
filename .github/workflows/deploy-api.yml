@@ -1,11 +1,6 @@
 name: Deploy MedDigtwin API
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "api/**"
-      - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
 permissions:
@@ -21,13 +16,14 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}

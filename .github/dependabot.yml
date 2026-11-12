@@ -23,6 +23,20 @@ updates:
       - dependencies
       - security
 
+  - package-ecosystem: npm
+    directory: "/infra/cdk"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    groups:
+      cdk-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
