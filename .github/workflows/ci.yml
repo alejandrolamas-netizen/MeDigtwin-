@@ -30,7 +30,7 @@ jobs:
         run: pip install pytest
 
       - name: Run API tests
-        run: PYTHONPATH=. python -m pytest api/tests -q
+        run: PYTHONPATH=. python -m pytest api/tests tests -q
 
       - name: Check browser JavaScript syntax
         run: |
